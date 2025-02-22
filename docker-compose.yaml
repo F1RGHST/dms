@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  web:
+    container_name: web
+    image: web
+    build:
+      context: web
+    ports:
+      - "8080:3000"
+    networks:
+      - app
+
+  storage:
+    container_name: storage
+    image: storage
+    build:
+      context: storage
+    ports:
+      - "8081:8080"
+    networks:
+      - app
+
+  search:
+    container_name: search
+    image: search
+    build:
+      context: search
+    ports:
+      - "8082:8080"
+    networks:
+      - app
+
+  ocr:
+    container_name: ocr
+    image: ocr
+    build:
+      context: ocr
+    ports:
+      - "8083:5000"
+    networks:
+      - app
+
+networks:
+  app:
+    driver: bridge
