@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   web:
     container_name: web
@@ -40,6 +38,28 @@ services:
       - "8083:5000"
     networks:
       - app
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root
+      POSTGRES_DB: dms
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    environment:
+      MINIO_ACCESS_KEY: minio
+      MINIO_SECRET_KEY: minio123
+    ports:
+      - "9000:9000"
+    command: server /data
+    volumes:
+      - ./minio-data:/data
 
 networks:
   app:
