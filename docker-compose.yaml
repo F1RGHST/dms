@@ -40,6 +40,7 @@ services:
       - app
 
   postgres:
+    container_name: postgres
     image: postgres:15
     environment:
       POSTGRES_USER: postgres
@@ -51,15 +52,15 @@ services:
       - ./postgres-data:/var/lib/postgresql/data
 
   minio:
+    container_name: minio
     image: minio/minio:latest
     environment:
-      MINIO_ACCESS_KEY: minio
-      MINIO_SECRET_KEY: minio123
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
     ports:
       - "9000:9000"
-    command: server /data
-    volumes:
-      - ./minio-data:/data
+      - "9090:9090"
+    command: server /data --console-address ":9090"
 
 networks:
   app:
