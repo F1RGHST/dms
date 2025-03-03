@@ -46,6 +46,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: root
       POSTGRES_DB: dms
+    networks:
+      - app
     ports:
       - "5432:5432"
     volumes:
@@ -61,6 +63,8 @@ services:
       - "9000:9000"
       - "9090:9090"
     command: server /data --console-address ":9090"
+    networks:
+      - app
 
 networks:
   app:
