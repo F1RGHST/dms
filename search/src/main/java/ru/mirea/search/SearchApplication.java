@@ -1,4 +1,4 @@
-package ru.mirea.search;
+package ru.mirea.dms.search;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
