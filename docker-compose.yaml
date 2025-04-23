@@ -1,43 +1,64 @@
 services:
+  builder:
+    profiles: ["build"]
+    image: maven:3.8.5-openjdk-17-slim
+    container_name: dms_builder
+    volumes:
+      - ./:/usr/src/dms
+      - m2-repo:/root/.m2
+    working_dir: /usr/src/dms
+    command: >
+      sh -c "
+        cd storage && mvn clean install &&
+        cd ../search  && mvn clean install
+      "
+    restart: "no"
+
   web:
     container_name: web
+    build: ./web
     image: web
-    build:
-      context: web
     ports:
       - "8080:3000"
     networks:
       - app
+    depends_on:
+      - postgres
+      - minio
 
   storage:
     container_name: storage
+    build: ./storage
     image: storage
-    build:
-      context: storage
     ports:
       - "8081:8080"
     networks:
       - app
+    depends_on:
+      - postgres
+      - minio
 
   search:
     container_name: search
+    build: ./search
     image: search
-    build:
-      context: search
     ports:
       - "8082:8080"
     networks:
       - app
+    depends_on:
+      - postgres
 
   ocr:
     container_name: ocr
+    build: ./ocr
     image: ocr
-    build:
-      context: ocr
     ports:
       - "8083:5000"
     networks:
       - app
+    depends_on:
+      - postgres
 
   postgres:
     container_name: postgres
@@ -46,12 +67,12 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: root
       POSTGRES_DB: dms
-    networks:
-      - app
     ports:
       - "5432:5432"
     volumes:
-      - ./postgres-data:/var/lib/postgresql/data
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - app
 
   minio:
     container_name: minio
@@ -59,12 +80,16 @@ services:
     environment:
       MINIO_ROOT_USER: minio
       MINIO_ROOT_PASSWORD: minio123
+    command: server /data --console-address ":9090"
     ports:
       - "9000:9000"
       - "9090:9090"
-    command: server /data --console-address ":9090"
     networks:
       - app
+
+volumes:
+  m2-repo:
+  postgres-data:
 
 networks:
   app:
