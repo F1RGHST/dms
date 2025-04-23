@@ -1,5 +1,6 @@
 services:
   builder:
+    profiles: ["build"]
     image: maven:3.8.5-openjdk-17-slim
     container_name: dms_builder
     volumes:
@@ -22,7 +23,8 @@ services:
     networks:
       - app
     depends_on:
-      - builder
+      - postgres
+      - minio
 
   storage:
     container_name: storage
@@ -33,7 +35,6 @@ services:
     networks:
       - app
     depends_on:
-      - builder
       - postgres
       - minio
 
@@ -46,7 +47,6 @@ services:
     networks:
       - app
     depends_on:
-      - builder
       - postgres
 
   ocr:
@@ -58,7 +58,7 @@ services:
     networks:
       - app
     depends_on:
-      - builder
+      - postgres
 
   postgres:
     container_name: postgres
