@@ -9,6 +9,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.time.ZoneOffset;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -41,14 +44,15 @@ public class FileServiceImpl implements FileService {
       .build();
     minio.putObject(args);
 
+    StatObjectResponse stat = minio.statObject(StatObjectArgs.builder().bucket(bucket).object(objectName).build());
+    ZonedDateTime odtStat = stat.lastModified();
+    Instant zdtStat = odtStat.toInstant();
+
     FileInfo info = new FileInfo();
     info.setObjectName(objectName);
     info.setSize(file.getSize());
     info.setContentType(file.getContentType());
-    info.setLastModified(
-      minio.statObject(StatObjectArgs.builder()
-         .bucket(bucket).object(objectName).build())
-         .lastModified().atZoneSameInstant(ZoneOffset.UTC));
+    info.setLastModified(zdtStat);
     return info;
   }
 
@@ -84,10 +88,12 @@ public class FileServiceImpl implements FileService {
     for (Result<Item> r : results) {
       Item item = r.get();
       FileInfo info = new FileInfo();
+      ZonedDateTime odtStat = item.lastModified();
+      Instant instItem = odtStat.toInstant();
       info.setObjectName(item.objectName());
       info.setSize(item.size());
       info.setContentType(null);
-      info.setLastModified(item.lastModified().atZoneSameInstant(ZoneOffset.UTC));
+      info.setLastModified(instItem);
       all.add(info);
     }
     return all;
