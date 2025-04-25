@@ -8,8 +8,8 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class MinioConfig {
     @Value("http://minio:9000") private String endpoint;
-    @Value("RQOcTT9TP1VMpVLh5DRF") private String accessKey;
-    @Value("cnfjJm15O7iFNSnZoKJPQUkFLgqqTrU4NGZ0Qol8") private String secretKey;
+    @Value("63UDU4sSMgtG8pjS754i") private String accessKey;
+    @Value("5vtaetOewoevIj7uDXp2W7MR1EF5EFHr6x2GZZfI") private String secretKey;
     
     @Bean
     public MinioClient minioClient() {
