@@ -26,6 +26,17 @@ services:
       - postgres
       - minio
 
+  gateway:
+    container_name: gateway
+    build: ./gateway
+    ports:
+      - "3457:8000"
+    networks:
+      - app
+    depends_on:
+      - search
+      - storage
+
   storage:
     container_name: storage
     build: ./storage
@@ -63,6 +74,7 @@ services:
   postgres:
     container_name: postgres
     image: postgres:15
+    restart: always
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: root
@@ -74,6 +86,33 @@ services:
     networks:
       - app
 
+    # <--- DISABLE the default pg_isready healthcheck to stop the FATAL logs
+    healthcheck:
+      disable: true
+
+    entrypoint:
+      - sh
+      - -c
+      - |
+        set -e
+
+        if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
+          exec docker-entrypoint.sh postgres
+        fi
+
+        docker-entrypoint.sh postgres &
+        pid="$$!"
+
+        until pg_isready -U "$$POSTGRES_USER"; do
+          sleep 0.1
+        done
+
+        psql -v ON_ERROR_STOP=1 \
+             -U "$$POSTGRES_USER" \
+             -c "ALTER USER \"$$POSTGRES_USER\" WITH PASSWORD '$$POSTGRES_PASSWORD';"
+
+        wait "$$pid"
+
   minio:
     container_name: minio
     image: minio/minio:latest
@@ -82,7 +121,7 @@ services:
       MINIO_ROOT_PASSWORD: minio123
     command: server /data --console-address ":9090"
     ports:
-      - "9000:9000"
+      - "9005:9000"
       - "9090:9090"
     networks:
       - app
