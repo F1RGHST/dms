@@ -1,4 +1,4 @@
-package ru.mirea.dms.storage.dto
+package ru.mirea.dms.storage.dto;
 
 import java.time.ZonedDateTime;
 import java.time.ZoneOffset;
