@@ -1,91 +1,101 @@
 package ru.mirea.dms.storage.service;
 
+import ru.mirea.dms.storage.dto.FileInfo;
 import io.minio.*;
-import lombok.RequiredArgsConstructor;
+import io.minio.messages.Item;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import ru.mirea.dms.storage.dto.FileUploadRequest;
-import ru.mirea.dms.storage.dto.FileDeleteRequest;
-import ru.mirea.dms.storage.dto.FileResponse;
-import ru.mirea.dms.storage.model.FileEntity;
-import ru.mirea.dms.storage.repository.FileRepository;
-import ru.mirea.dms.storage.service.FileService;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.io.ByteArrayInputStream;
-import java.util.Base64;
-import java.time.LocalDateTime;
+import java.io.InputStream;
+import java.time.ZoneOffset;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 public class FileServiceImpl implements FileService {
 
-    private final FileRepository fileRepository;
+  private final MinioClient minio;
+  private final String bucket;
 
-    private final MinioClient minioClient;
+  public FileServiceImpl(MinioClient minio,
+                         @Value("${minio.bucket}") String bucket) throws Exception {
+    this.minio  = minio;
+    this.bucket = bucket;
 
-    public FileServiceImpl(@Value("${minio.url}") String url,
-                           @Value("${minio.access-key}") String accessKey,
-                           @Value("${minio.secret-key}") String secretKey,
-                           FileRepository fileRepository) {
-        this.minioClient = MinioClient.builder()
-                .endpoint(url)
-                .credentials(accessKey, secretKey)
-                .build();
-        this.fileRepository = fileRepository;
+    boolean exists = minio.bucketExists(BucketExistsArgs.builder().bucket(bucket).build());
+    if (!exists) {
+      minio.makeBucket(MakeBucketArgs.builder().bucket(bucket).build());
     }
+  }
 
-    @Override
-    public FileResponse uploadFile(FileUploadRequest request) {
-        try {
-            byte[] data = Base64.getDecoder().decode(request.getBase64Content());
+  @Override
+  public FileInfo upload(MultipartFile file) throws Exception {
+    String objectName = UUID.randomUUID() + "-" + file.getOriginalFilename();
+    PutObjectArgs args = PutObjectArgs.builder()
+      .bucket(bucket)
+      .object(objectName)
+      .stream(file.getInputStream(), file.getSize(), -1)
+      .contentType(file.getContentType())
+      .build();
+    minio.putObject(args);
 
-            minioClient.putObject(
-                    PutObjectArgs.builder()
-                            .bucket(request.getBucketName())
-                            .object(request.getFilename())
-                            .stream(new ByteArrayInputStream(data), data.length, -1)
-                            .contentType(request.getContentType())
-                            .build()
-            );
+    StatObjectResponse stat = minio.statObject(StatObjectArgs.builder().bucket(bucket).object(objectName).build());
+    ZonedDateTime odtStat = stat.lastModified();
+    Instant zdtStat = odtStat.toInstant();
 
-            FileEntity fileEntity = new FileEntity();
-            fileEntity.setFilename(request.getFilename());
-            fileEntity.setBucket(request.getBucketName());
-            fileEntity.setUploadDate(LocalDateTime.now());
-            fileRepository.save(fileEntity);
+    FileInfo info = new FileInfo();
+    info.setObjectName(objectName);
+    info.setSize(file.getSize());
+    info.setContentType(file.getContentType());
+    info.setLastModified(zdtStat);
+    return info;
+  }
 
-            return new FileResponse("Файл успешно загружен");
+  @Override
+  public InputStream download(String objectName) throws Exception {
+    return minio.getObject(GetObjectArgs.builder()
+      .bucket(bucket).object(objectName).build());
+  }
 
-        } catch (Exception e) {
-            throw new RuntimeException("Ошибка загрузки файла", e);
-        }
+  @Override
+  public FileInfo update(String objectName, MultipartFile file) throws Exception {
+    PutObjectArgs args = PutObjectArgs.builder()
+      .bucket(bucket)
+      .object(objectName)
+      .stream(file.getInputStream(), file.getSize(), -1)
+      .contentType(file.getContentType())
+      .build();
+    minio.putObject(args);
+    return upload(file);
+  }
+
+  @Override
+  public void delete(String objectName) throws Exception {
+    minio.removeObject(RemoveObjectArgs.builder()
+      .bucket(bucket).object(objectName).build());
+  }
+
+  @Override
+  public List<FileInfo> listAll() throws Exception {
+    List<FileInfo> all = new ArrayList<>();
+    Iterable<Result<Item>> results = minio.listObjects(
+      ListObjectsArgs.builder().bucket(bucket).build());
+    for (Result<Item> r : results) {
+      Item item = r.get();
+      FileInfo info = new FileInfo();
+      ZonedDateTime odtStat = item.lastModified();
+      Instant instItem = odtStat.toInstant();
+      info.setObjectName(item.objectName());
+      info.setSize(item.size());
+      info.setContentType(null);
+      info.setLastModified(instItem);
+      all.add(info);
     }
-
-    @Override
-    public byte[] downloadFile(String bucketName, String filename) {
-        try {
-            return minioClient.getObject(
-                    GetObjectArgs.builder()
-                            .bucket(bucketName)
-                            .object(filename)
-                            .build()
-            ).readAllBytes();
-        } catch (Exception e) {
-            throw new RuntimeException("Ошибка скачивания файла", e);
-        }
-    }
-
-    @Override
-    public FileResponse deleteFile(FileDeleteRequest request) {
-        try {
-            minioClient.removeObject(
-                    RemoveObjectArgs.builder()
-                            .bucket(request.getBucketName())
-                            .object(request.getFilename())
-                            .build()
-            );
-            return new FileResponse("Файл успешно удален");
-        } catch (Exception e) {
-            throw new RuntimeException("Ошибка удаления файла", e);
-        }
-    }
+    return all;
+  }
 }

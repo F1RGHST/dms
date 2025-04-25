@@ -1,39 +1,55 @@
 package ru.mirea.dms.storage.controller;
 
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.*;
-import org.springframework.web.bind.annotation.*;
-import ru.mirea.dms.storage.dto.FileUploadRequest;
-import ru.mirea.dms.storage.dto.FileDeleteRequest;
-import ru.mirea.dms.storage.dto.FileResponse;
+import ru.mirea.dms.storage.dto.FileInfo;
 import ru.mirea.dms.storage.service.FileService;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.InputStream;
+import java.util.List;
 
 @RestController
-@RequestMapping("/api/storage")
-@RequiredArgsConstructor
+@RequestMapping("/api/files")
 public class FileController {
 
-    private final FileService fileService;
+  private final FileService fileService;
+  public FileController(FileService fileService) {
+    this.fileService = fileService;
+  }
 
-    @PostMapping("/upload")
-    public ResponseEntity<FileResponse> upload(@RequestBody FileUploadRequest request) {
-        return ResponseEntity.ok(fileService.uploadFile(request));
-    }
+  @PostMapping
+  public FileInfo upload(@RequestParam("file") MultipartFile file) throws Exception {
+    return fileService.upload(file);
+  }
 
-    @GetMapping("/download")
-    public ResponseEntity<byte[]> download(@RequestParam String bucketName,
-                                           @RequestParam String filename) {
-        byte[] data = fileService.downloadFile(bucketName, filename);
+  @GetMapping
+  public List<FileInfo> list() throws Exception {
+    return fileService.listAll();
+  }
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
-        headers.setContentDisposition(ContentDisposition.attachment().filename(filename).build());
+  @GetMapping("/{objectName}")
+  public ResponseEntity<InputStreamResource> download(
+      @PathVariable String objectName) throws Exception {
 
-        return new ResponseEntity<>(data, headers, HttpStatus.OK);
-    }
+    InputStream is = fileService.download(objectName);
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + objectName + "\"")
+        .body(new InputStreamResource(is));
+  }
 
-    @DeleteMapping("/delete")
-    public ResponseEntity<FileResponse> delete(@RequestBody FileDeleteRequest request) {
-        return ResponseEntity.ok(fileService.deleteFile(request));
-    }
+  @PutMapping("/{objectName}")
+  public FileInfo update(@PathVariable String objectName,
+                         @RequestParam("file") MultipartFile file) throws Exception {
+    return fileService.update(objectName, file);
+  }
+
+  @DeleteMapping("/{objectName}")
+  public ResponseEntity<Void> delete(@PathVariable String objectName) throws Exception {
+    fileService.delete(objectName);
+    return ResponseEntity.noContent().build();
+  }
 }
